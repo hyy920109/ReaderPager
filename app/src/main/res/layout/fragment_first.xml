@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.hyy.scrolldemo.CustomScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    app:csl_orientation="horizontal"
+    tools:context=".FirstFragment">
+
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/teal_200"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/black"/>
+</com.hyy.scrolldemo.CustomScrollView>
