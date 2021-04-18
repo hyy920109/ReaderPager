@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.ViewConfiguration
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import kotlin.math.abs
 
 /**

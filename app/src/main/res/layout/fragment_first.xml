@@ -5,16 +5,33 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:csl_orientation="horizontal"
+    android:padding="16dp"
     tools:context=".FirstFragment">
 
+   <LinearLayout
+       android:layout_width="920dp"
+       android:layout_height="wrap_content"
+       android:orientation="horizontal">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/teal_200"/>
+       <View
+           android:layout_width="100dp"
+           android:layout_height="100dp"
+           android:background="@color/teal_200"/>
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/black"/>
+       <View
+           android:layout_width="360dp"
+           android:layout_height="match_parent"
+           android:background="@color/black"/>
+
+       <View
+           android:layout_width="100dp"
+           android:layout_height="100dp"
+           android:background="@color/teal_200"/>
+
+       <View
+           android:layout_width="360dp"
+           android:layout_height="match_parent"
+           android:background="@color/black"/>
+
+   </LinearLayout>
 </com.hyy.scrolldemo.CustomScrollView>
