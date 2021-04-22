@@ -2,9 +2,12 @@ package com.hyy.scrolldemo
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.os.StrictMode
 import android.util.AttributeSet
-import android.view.*
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.OverScroller
 import android.widget.Toast
@@ -40,7 +43,7 @@ class CustomScrollView constructor(context: Context, attributeSet: AttributeSet?
         maximumVelocity = configuration.scaledMaximumFlingVelocity
         overScrollDistance = configuration.scaledOverscrollDistance
         overFlingDistance = configuration.scaledOverflingDistance
-        scroller = OverScroller(context)
+        scroller = OverScroller(context, DecelerateInterpolator(1.25f))
     }
 
     private var orientation: Int = ORIENTATION_HORIZONTAL
@@ -72,6 +75,7 @@ class CustomScrollView constructor(context: Context, attributeSet: AttributeSet?
                         (scrollX >= getScrollRange() && distanceX > 0)).not()
                 if (canScroll) {
                     scrollBy((distanceX).toInt(), 0)
+                    println("$TAG scrollX-->$scrollX")
                 }
                 return true
             }
@@ -95,10 +99,11 @@ class CustomScrollView constructor(context: Context, attributeSet: AttributeSet?
                 val canFling = ((scrollX <= 0 && velocityX > 0) ||
                         (scrollX >= getScrollRange() && velocityX < 0)).not()
                 println("$TAG onFling-->canFling -->$canFling")
+                println("$TAG onFling-->velocityX -->$velocityX")
                 if (canFling) {
-                    fling(velocityX.toInt())
+                    fling(-velocityX.toInt())
                 }
-                return true
+                return false
             }
 
         })
@@ -109,21 +114,40 @@ class CustomScrollView constructor(context: Context, attributeSet: AttributeSet?
             val bottom = getChildAt(0).width
             scroller.fling(
                 scrollX, scrollY, velocityX, 0, 0, getScrollRange(), 0,
-                0, width/2, 0
+                0
             )
         }
     }
+
 
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
             val currX = scroller.currX
             val scrollX = scrollX
+            println("$TAG computeScroll-->${currX}")
             if (scrollX != currX) {
-//                overScrollBy(currX - scrollX, 0, scrollX, scrollY, getScrollRange(), 0, 0, overScrollDistance, false)
-                scrollBy(currX - scrollX, 0)
+                overScrollBy(
+                    currX - scrollX,
+                    0,
+                    scrollX,
+                    scrollY,
+                    getScrollRange(),
+                    0,
+                    0,
+                    overScrollDistance,
+                    false
+                )
             }
+
+            // Keep on drawing until the animation has finished.
+            postInvalidateOnAnimation()
         }
     }
+
+    override fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean) {
+        super.scrollTo(scrollX, scrollY)
+    }
+
     private fun getScrollRange(): Int {
         var scrollRange = 0
         if (childCount > 0) {

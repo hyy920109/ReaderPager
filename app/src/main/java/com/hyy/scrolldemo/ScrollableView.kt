@@ -16,7 +16,7 @@ import androidx.appcompat.widget.AppCompatTextView
  *Create by hyy on 2021/4/14
  */
 class ScrollableView constructor(context: Context, attributeSet: AttributeSet?) :
-    AppCompatImageView(context, attributeSet) {
+    View(context, attributeSet) {
     private var lastX = 0f
     private var lastY = 0f
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -27,7 +27,6 @@ class ScrollableView constructor(context: Context, attributeSet: AttributeSet?) 
     //canvas from parent
     override fun onDraw(canvas: Canvas?) {
         super.onDraw(canvas)
-        this.x
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
