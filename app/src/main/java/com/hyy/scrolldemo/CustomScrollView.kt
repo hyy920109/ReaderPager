@@ -14,6 +14,8 @@ import android.widget.Toast
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.children
 import androidx.core.view.isGone
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager.widget.ViewPager
 
 /**
  *Create by hyy on 2021/4/16
@@ -44,6 +46,8 @@ class CustomScrollView constructor(context: Context, attributeSet: AttributeSet?
         overScrollDistance = configuration.scaledOverscrollDistance
         overFlingDistance = configuration.scaledOverflingDistance
         scroller = OverScroller(context, DecelerateInterpolator(1.25f))
+//        ViewPager
+//        RecyclerView.ViewHolder
     }
 
     private var orientation: Int = ORIENTATION_HORIZONTAL
