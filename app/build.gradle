@@ -1,6 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'kotlin-android'
+    id 'com.didi.dokit'
 }
 
 android {
@@ -48,4 +49,7 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+
+    debugImplementation "com.didichuxing.doraemonkit:dokitx:3.3.5"
+    releaseImplementation "com.didichuxing.doraemonkit:dokitx-no-op:3.3.5"
 }

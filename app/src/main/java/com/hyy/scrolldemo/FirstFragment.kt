@@ -6,9 +6,6 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import androidx.appcompat.widget.AppCompatTextView
-import androidx.navigation.fragment.findNavController
 import com.hyy.scrolldemo.databinding.FragmentFirstBinding
 import com.hyy.scrolldemo.databinding.ItemPageBinding
 import com.hyy.scrolldemo.databinding.ItemPageImageBinding
@@ -19,6 +16,9 @@ import kotlin.random.Random
  */
 class FirstFragment : Fragment() {
 
+    private val contents = arrayOf("啦啦啦啦啦啦啦啦啦啦啦啦啦啦啦啦", "hahahahahahhahahha",
+    "呵呵呵呵呵呵呵呵呵呵", "lolololololololo", "enennenenennenen")
+    private val colors = arrayOf(Color.LTGRAY, Color.WHITE, Color.CYAN, Color.GRAY)
     private lateinit var binding: FragmentFirstBinding
 
     companion object {
@@ -61,25 +61,27 @@ class FirstFragment : Fragment() {
                 position: Int,
                 itemType: Int
             ) {
+                println("ReaderPager------>bindViewHolder-->$position")
                 if (viewholder is TextViewHolder) {
                     viewholder.binding.tvTitle.apply {
-                        "我是PAGE $position".also { text = it }
-                        setBackgroundColor(Color.argb(Random.nextInt(255), Random.nextInt(255),Random.nextInt(255),Random.nextInt(255)))
+                        "当前是PAGE$position".also { text = it }
+                        setBackgroundColor(colors[Random.nextInt(4)])
                     }
                 }else if (viewholder is ImageViewHolder) {
                     viewholder.binding.tvTitle.apply {
-                        "我是PAGE $position".also { text = it }
+                        contents[position].also { text = it }
                     }
-                    viewholder.binding.root.setBackgroundColor(Color.argb(Random.nextInt(255), Random.nextInt(255),Random.nextInt(255),Random.nextInt(255)))
+//                    viewholder.binding.root.setBackgroundColor(Color.argb(Random.nextInt(255), Random.nextInt(255),Random.nextInt(255),Random.nextInt(255)))
 
                 }
 
             }
 
             override fun getItemType(position: Int): Int {
-                return if (position%2==0) {
-                    ITEM_TYPE_TEXT
-                } else ITEM_TYPE_IMAGE
+//                return if (position%2==0) {
+//                    ITEM_TYPE_TEXT
+//                } else ITEM_TYPE_IMAGE
+                return ITEM_TYPE_TEXT
             }
         })
     }

@@ -4,13 +4,9 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
 import android.view.MotionEvent
-import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.view.animation.DecelerateInterpolator
 import android.view.animation.Interpolator
 import android.widget.OverScroller
-import android.widget.Toast
 import androidx.core.view.ViewCompat
 import androidx.core.view.children
 import androidx.core.view.isGone
@@ -18,25 +14,22 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
+class ReaderPagerSinglePoint constructor(context: Context, attributeSet: AttributeSet?)
     : ViewGroup(context, attributeSet) {
 
+    private var downScrollX: Int = 0
     private var preloadingPage: Boolean = false
-    private lateinit var adapter: ReaderPagerAdapter<ViewHolder>
+    private lateinit var adapter: ReaderPagerAdapter<ReaderPager.ViewHolder>
     private val scroller: OverScroller = OverScroller(context, interpolator)
 
     private var curItemIndex = 0
 
-    private val itemViewHolders = mutableListOf<ViewHolder>()
+    private val itemViewHolders = mutableListOf<ReaderPager.ViewHolder>()
 
-    private val cacheItemViewHolders = mutableListOf<ViewHolder>()
-
-    private var totalScrollX = 0.0f
-    private var offsetPage = 0.0f
+    private val cacheItemViewHolders = mutableListOf<ReaderPager.ViewHolder>()
 
     private var pageScrollState = PAGE_STATE_IDLE
     private var pageDirection = PAGE_DIRECTION_CURRENT
-
 
     init {
 
@@ -44,144 +37,147 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
 
     //默认GestureDetectorCompat不支持单纯的action_up事件
     //解决方案copy源码并让onFling不限制速度就可以了拿到up事件了
-    private val gestureDetector= GestureDetectorCompat(
-        context,
-        object : GestureDetectorCompat.CustomOnGestureListener {
-            override fun onDown(e: MotionEvent?): Boolean {
-                println("$TAG onDown-->e--->${e?.x}")
-                totalScrollX = 0.0f
-                offsetPage = 0f
-                scroller.forceFinished(true)
-                printViewHolders()
-                return true
-            }
-
-            override fun onLongClicked(e: MotionEvent?): Boolean {
-                //需要根据情况返回true或者false 如果返回true 则代表后续其他事件都没用了
-
-                return false
-            }
-
-            override fun onShowPress(e: MotionEvent?) {
-            }
-
-            override fun onSingleTapUp(e: MotionEvent?): Boolean {
-                //纯粹的点击事件
-                if (scrollX % measuredWidth == 0) return true
-                val needDeltaX = calculateTargetDeltaX(curItemIndex, scrollX)
-                scroller.startScroll(scrollX, 0, -needDeltaX, 0, 350)
-                ViewCompat.postInvalidateOnAnimation(this@ReaderPager)
-                checkNeedRemoveSomeUselessItemViewHolder()
-                return true
-            }
-
-            override fun onScroll(
-                e1: MotionEvent,
-                e2: MotionEvent,
-                distanceX: Float,
-                distanceY: Float
-            ): Boolean {
-                requestDisallowInterceptTouchEvent(true)
-                val canScroll = ((scrollX + distanceX < 0) ||
-                        (scrollX + distanceX > getScrollRange())).not()
-
-                if (canScroll) {
-                    //记录总共滑动距离
-                    totalScrollX += distanceX
-                    val totalOffset = totalScrollX / measuredWidth
-
-                    if (totalOffset - offsetPage > 0) {
-                        preloadNextPage(curItemIndex + 1)
-                        //处理多指滑动问题 滚动超过一屏幕
-                        if (totalOffset - offsetPage >= 1f) {
-                            curItemIndex++
-                            offsetPage = totalOffset
-                            checkNeedRemoveSomeUselessItemViewHolder()
-                            Toast.makeText(context, "往前划到第$curItemIndex 页数据了", Toast.LENGTH_SHORT).show()
-                        }
-                        setPageDirection(PAGE_DIRECTION_NEXT)
-                    } else  {
-                        preloadPrePage(curItemIndex - 1)
-                        if (totalOffset - offsetPage <= -1f) {
-                            offsetPage = totalOffset
-                            curItemIndex--
-                            checkNeedRemoveSomeUselessItemViewHolder()
-                            Toast.makeText(context, "后翻划到第$curItemIndex 页数据了", Toast.LENGTH_SHORT).show()
-                        }
-                        setPageDirection(PAGE_DIRECTION_PRE)
+    private val gestureDetector = GestureDetectorCompat(
+            context,
+            object : GestureDetectorCompat.CustomOnGestureListener {
+                override fun onDown(e: MotionEvent): Boolean {
+                    println("$TAG onDown-->e--->${e.x}")
+                    if (getPageState() == PAGE_STATE_FLING) {
+                        scroller.abortAnimation()
+                        ViewCompat.postInvalidateOnAnimation(this@ReaderPagerSinglePoint)
+                    } else {
+                        setPageState(PAGE_STATE_IDLE)
+                        setPageDirection(PAGE_DIRECTION_CURRENT)
                     }
-                    scrollBy((distanceX).toInt(), 0)
+                    downScrollX = scrollX
 
+                    printViewHolders()
+                    return true
                 }
-                println("$TAG onScroll-->$scrollX")
-                return true
-            }
 
-            override fun onLongPress(e: MotionEvent?) {
-                println("$TAG onLongPress-->")
-            }
+                override fun onLongClicked(e: MotionEvent): Boolean {
+                    //需要根据情况返回true或者false 如果返回true 则代表后续其他事件都没用了
+                    return false
+                }
 
-            //源码中 GestureDetector已经在action_up中处理了 并且已经计算结果已经考虑了相关
-            //minimumVelocity  maximumVelocity
-            override fun onFling(
-                e1: MotionEvent,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
-                val itemHolder = itemViewHolders.find { it.position == curItemIndex }
-                println("$TAG onFling-->$itemHolder")
-                if (velocityX < 0f) {
-                    println("$TAG Fling to left page need ++  $curItemIndex")
-                    itemHolder?.run {
-                        if (scrollX < this.viewLeft) {
-                            //这种情况是前面是往右滑动 最后抬起手指fling的时候 方向是向左的
-                            //这个时候curItemIndex不需要变
+                override fun onShowPress(e: MotionEvent) {
+                }
+
+                override fun onSingleTapUp(e: MotionEvent): Boolean {
+                    if (getPageState() == PAGE_STATE_FLING) {
+                        scroller.abortAnimation()
+                        ViewCompat.postInvalidateOnAnimation(this@ReaderPagerSinglePoint)
+                    } else {
+                        //判断点击区域 然后看是弹出菜单还是。。
+
+                    }
+                    return true
+                }
+
+                override fun onScroll(
+                        e1: MotionEvent,
+                        e2: MotionEvent,
+                        distanceX: Float,
+                        distanceY: Float
+                ): Boolean {
+                    requestDisallowInterceptTouchEvent(true)
+                    val deltaX = e1.x - e2.x
+                    val canScroll = ((downScrollX + deltaX < 0) ||
+                            (downScrollX + deltaX > getScrollRange())).not()
+
+                    if (getPageDirection() == PAGE_DIRECTION_CURRENT) {
+                        if (deltaX > 0) {
+                            preloadNextPage(curItemIndex + 1)
                         } else {
-                            curItemIndex++
-                            curItemIndex = min(itemViewHolders[itemViewHolders.size-1].position, curItemIndex)
-                            checkNeedRemoveSomeUselessItemViewHolder()
+                            preloadPrePage(curItemIndex - 1)
                         }
                     }
 
-                } else {
-                    println("$TAG Fling to right page need-- $curItemIndex")
-                    itemHolder?.run {
-                        if (scrollX > this.viewLeft) {
-                            //这种情况是前面是往左滑动 最后抬起手指fling的时候 方向是向右的
-                            //这个时候curItemIndex不需要变
+                    println("$TAG onScroll deltaX-->$deltaX")
+                    if (canScroll) {
+                        if (deltaX > 0) {
+                            setPageDirection(PAGE_DIRECTION_NEXT)
                         } else {
-                            curItemIndex--
-                            curItemIndex = max(0, curItemIndex)
-                            checkNeedRemoveSomeUselessItemViewHolder()
+                            setPageDirection(PAGE_DIRECTION_PRE)
                         }
+                        scrollTo((downScrollX + deltaX).toInt(), 0)
+                        setPageState(PAGE_STATE_SCROLL)
+                    } else {
+                        //需要还有数据了
                     }
 
+                    return true
                 }
 
-                itemViewHolders.find { it.position == curItemIndex }?.run {
-                    scroller.startScroll(scrollX, 0, this.viewLeft - scrollX, 0, 350)
-                    ViewCompat.postInvalidateOnAnimation(this@ReaderPager)
+                override fun onLongPress(e: MotionEvent?) {
+                    println("$TAG onLongPress-->")
                 }
 
-                return true
-            }
+                //源码中 GestureDetector已经在action_up中处理了 并且已经计算结果已经考虑了相关
+                //minimumVelocity  maximumVelocity
+                override fun onFling(
+                        e1: MotionEvent,
+                        e2: MotionEvent,
+                        velocityX: Float,
+                        velocityY: Float
+                ): Boolean {
+                    val itemHolder = itemViewHolders.find { it.position == curItemIndex }
+                    println("$TAG onFling-->$itemHolder")
+                    if (velocityX < 0f) {
+                        println("$TAG Fling to next page need ++  $curItemIndex")
+                        itemHolder?.run {
+                            if (scrollX < this.viewLeft) {
+                                //这种情况是前面是往右滑动 最后抬起手指fling的时候 方向是向左的
+                                //这个时候curItemIndex不需要变
+                            } else {
+                                preloadNextPage(curItemIndex + 1)
+                                curItemIndex++
+                                curItemIndex = min(itemViewHolders[itemViewHolders.size - 1].position, curItemIndex)
+                                checkNeedRemoveSomeUselessItemViewHolder()
+                            }
+                        }
 
-            override fun onUp(
-                e1: MotionEvent,
-                e2: MotionEvent,
-                deltaX: Float,
-                deltaY: Float
-            ): Boolean {
+                    } else {
+                        println("$TAG Fling to pre page need--")
+                        itemHolder?.run {
+                            if (scrollX > this.viewLeft) {
+                                //这种情况是前面是往左滑动 最后抬起手指fling的时候 方向是向右的
+                                //这个时候curItemIndex不需要变
+                            } else {
+                                preloadPrePage(curItemIndex - 1)
+                                curItemIndex--
+                                curItemIndex = max(0, curItemIndex)
+                                checkNeedRemoveSomeUselessItemViewHolder()
+                            }
+                        }
 
-                val needDeltaX = calculateTargetDeltaX(curItemIndex, scrollX)
-                printViewHolders()
-                scroller.startScroll(scrollX, 0, -needDeltaX, 0, 350)
-                ViewCompat.postInvalidateOnAnimation(this@ReaderPager)
-                return false
-            }
+                    }
 
-        })
+                    itemViewHolders.find { it.position == curItemIndex }?.run {
+                        scroller.startScroll(scrollX, 0, this.viewLeft - scrollX, 0, 350)
+                        setPageState(PAGE_STATE_FLING)
+                        ViewCompat.postInvalidateOnAnimation(this@ReaderPagerSinglePoint)
+                    }
+
+                    return true
+                }
+
+                override fun onUp(
+                        e1: MotionEvent,
+                        e2: MotionEvent,
+                        deltaX: Float,
+                        deltaY: Float
+                ): Boolean {
+
+                    val needDeltaX = calculateTargetDeltaX(curItemIndex, scrollX)
+                    printViewHolders()
+                    scroller.startScroll(scrollX, 0, -needDeltaX, 0, 350)
+                    setPageState(PAGE_STATE_FLING)
+                    ViewCompat.postInvalidateOnAnimation(this@ReaderPagerSinglePoint)
+                    return false
+                }
+
+            })
 
     private fun printViewHolders() {
         itemViewHolders.forEach {
@@ -201,24 +197,23 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
     }
 
     private fun preloadPrePage(curPreIndex: Int) {
-        println("$TAG preloadNextPage-->nextIndex")
         if (preloadingPage.not() && curPreIndex > 0) {
             preloadingPage = true
-            val preIndex = curPreIndex-1
+            val preIndex = curPreIndex - 1
             checkNeedCreatePage(preIndex, true)
             preloadingPage = false
         }
     }
 
     private fun checkNeedCreatePage(index: Int, direction: Boolean) {
-        if (itemViewHolders.isEmpty())return
+        if (itemViewHolders.isEmpty()) return
         //先判断是否已经存在于itemViewHolders中了
         if (direction) {
             val viewHolder = itemViewHolders[0]
-            if (viewHolder.position == index && viewHolder.type == adapter.getItemType(index))return
-        }else {
-            val viewHolder = itemViewHolders[itemViewHolders.size-1]
-            if (viewHolder.position == index && viewHolder.type == adapter.getItemType(index))return
+            if (viewHolder.position == index && viewHolder.type == adapter.getItemType(index)) return
+        } else {
+            val viewHolder = itemViewHolders[itemViewHolders.size - 1]
+            if (viewHolder.position == index && viewHolder.type == adapter.getItemType(index)) return
         }
 
         val cacheItemViewHolder = cacheItemViewHolders.find { it.type == adapter.getItemType(index) }
@@ -226,18 +221,18 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
             cacheItemViewHolders.remove(cacheItemViewHolder)
             //reassign viewholder properties
             cacheItemViewHolder.position = index
-            adapter.bindViewHolder(cacheItemViewHolder, index, adapter.getItemType(index))
             if (direction) {
                 itemViewHolders.add(0, cacheItemViewHolder)
-               // addView(cacheItemViewHolder.view, 0)
+                // addView(cacheItemViewHolder.view, 0)
             } else {
                 itemViewHolders.add(cacheItemViewHolder)
                 //addView(cacheItemViewHolder.view)
             }
-            postInvalidate()
+            adapter.bindViewHolder(cacheItemViewHolder, index, adapter.getItemType(index))
             requestLayout()
+            postInvalidate()
 
-        }else {
+        } else {
             val viewHolder = adapter.createViewHolder(this, adapter.getItemType(index)).apply {
                 type = adapter.getItemType(index)
                 position = index
@@ -250,16 +245,14 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
                 addView(viewHolder.view)
             }
             adapter.bindViewHolder(viewHolder, index, adapter.getItemType(index))
-//                requestLayout()
         }
 
     }
 
     private fun preloadNextPage(curNextIndex: Int) {
-        println("$TAG preloadNextPage-->$curNextIndex")
-        if (preloadingPage.not() && curNextIndex < adapter.getItemCount()-1) {
+        if (preloadingPage.not() && curNextIndex < adapter.getItemCount() - 1) {
             preloadingPage = true
-            val nextIndex = curNextIndex+1
+            val nextIndex = curNextIndex + 1
             checkNeedCreatePage(nextIndex, false)
             preloadingPage = false
         }
@@ -278,8 +271,7 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
 
     private fun getPageDirection(): Int = PAGE_DIRECTION_MASK and pageDirection
 
-    private fun calculateTargetDeltaX(curItemIndex: Int, scrollX: Int): Int{
-//        if(curItemIndex >= childCount) return -1
+    private fun calculateTargetDeltaX(curItemIndex: Int, scrollX: Int): Int {
         val viewHolder = itemViewHolders.find { it.position == curItemIndex }
         viewHolder?.run {
             //往后面翻页和往前翻页计算不一样
@@ -288,19 +280,19 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
                 val width = viewHolder.viewRight - viewHolder.viewLeft
                 val toDesDistance = viewHolder.viewRight - scrollX
                 return if (abs(toDesDistance) < 0.5f * width) {//滑动了一大半了 需要滑动到下一页
-                    this@ReaderPager.curItemIndex ++
+                    this@ReaderPagerSinglePoint.curItemIndex++
                     -toDesDistance
-                }else {//没滑动一半宽度 需要回滚
-                    width-toDesDistance
+                } else {//没滑动一半宽度 需要回滚
+                    width - toDesDistance
                 }
-            }else {
+            } else {
                 val width = viewHolder.viewRight - viewHolder.viewLeft
                 val pageOffset = viewHolder.viewLeft - scrollX
                 return if (abs(pageOffset) < 0.5f * width) {//没滑动一半宽度 需要回滚
                     -pageOffset
-                }else {//滑动了一大半了 需要滑动到下一页
-                    this@ReaderPager.curItemIndex --
-                    width-pageOffset
+                } else {//滑动了一大半了 需要滑动到下一页
+                    this@ReaderPagerSinglePoint.curItemIndex--
+                    width - pageOffset
                 }
             }
 
@@ -312,24 +304,27 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
 
     private fun getScrollRange(): Int {
         return if (itemViewHolders.size == 0) 0 else
-            itemViewHolders[itemViewHolders.size-1].viewLeft
+            itemViewHolders[itemViewHolders.size - 1].viewLeft
     }
 
     override fun computeScroll() {
-        if (scroller.computeScrollOffset()) {
-            val currX = scroller.currX
-            println("$TAG  computeScroll->${currX != scrollX}")
-            if (currX != scrollX) {
-                scrollTo(currX, scrollY)
-            }
-            ViewCompat.postInvalidateOnAnimation(this@ReaderPager)
+        if (getPageState() == PAGE_STATE_FLING) {
+            if (scroller.computeScrollOffset()) {
+                val currX = scroller.currX
+                println("$TAG  computeScroll->${currX != scrollX}")
+                if (currX != scrollX) {
+                    scrollTo(currX, scrollY)
+                }
+                ViewCompat.postInvalidateOnAnimation(this@ReaderPagerSinglePoint)
 
-        }else {
-            if(scrollX % measuredWidth == 0) {
-                println("$TAG  computeScroll idle state-->$curItemIndex")
+            } else {
+                scrollTo(scroller.currX, scrollY)
                 checkNeedRemoveSomeUselessItemViewHolder()
+                setPageState(PAGE_STATE_IDLE)
+                setPageDirection(PAGE_DIRECTION_CURRENT)
             }
         }
+
     }
 
 
@@ -340,17 +335,15 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-        val width = r - l
-        val height = b - t
 
         var childLeft = paddingLeft
         val childTop = paddingTop
         if (childCount > 0) {
             itemViewHolders.forEachIndexed { index, viewHolder ->
-                viewHolder.view.let { child->
+                viewHolder.view.let { child ->
                     childLeft = viewHolder.position * measuredWidth
                     child.layout(childLeft, childTop,
-                        childLeft + child.measuredWidth, childTop + child.measuredHeight)
+                            childLeft + child.measuredWidth, childTop + child.measuredHeight)
                     viewHolder.apply {
                         viewLeft = childLeft
                         viewRight = childLeft + child.measuredWidth
@@ -424,13 +417,6 @@ class ReaderPager constructor(context: Context, attributeSet: AttributeSet?)
         itemViewHolders.clear()
         cacheItemViewHolders.clear()
         removeAllViews()
-    }
-
-    open class ViewHolder constructor(val view: View) {
-        var position = NO_POSITION
-        var type = DEFAULT_TYPE
-        var viewLeft = view.left
-        var viewRight = view.right
     }
 
     companion object {
