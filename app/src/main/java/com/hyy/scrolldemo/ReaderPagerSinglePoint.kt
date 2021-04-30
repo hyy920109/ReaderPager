@@ -32,7 +32,7 @@ class ReaderPagerSinglePoint constructor(context: Context, attributeSet: Attribu
     private var pageDirection = PAGE_DIRECTION_CURRENT
 
     init {
-
+        setWillNotDraw(false)
     }
 
     //默认GestureDetectorCompat不支持单纯的action_up事件
@@ -103,7 +103,7 @@ class ReaderPagerSinglePoint constructor(context: Context, attributeSet: Attribu
                         scrollTo((downScrollX + deltaX).toInt(), 0)
                         setPageState(PAGE_STATE_SCROLL)
                     } else {
-                        //需要还有数据了
+                        //需要还有数据了的时候拓展
                     }
 
                     return true
@@ -230,7 +230,6 @@ class ReaderPagerSinglePoint constructor(context: Context, attributeSet: Attribu
             }
             adapter.bindViewHolder(cacheItemViewHolder, index, adapter.getItemType(index))
             requestLayout()
-            postInvalidate()
 
         } else {
             val viewHolder = adapter.createViewHolder(this, adapter.getItemType(index)).apply {

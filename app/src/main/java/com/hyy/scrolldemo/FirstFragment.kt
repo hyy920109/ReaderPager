@@ -39,7 +39,7 @@ class FirstFragment : Fragment() {
 
         binding.readerPager.setAdapter(object : ReaderPagerAdapter<ReaderPager.ViewHolder>() {
             override fun getItemCount(): Int {
-                return 5
+                return 100
             }
 
             override fun createViewHolder(
@@ -61,11 +61,13 @@ class FirstFragment : Fragment() {
                 position: Int,
                 itemType: Int
             ) {
-                println("ReaderPager------>bindViewHolder-->$position")
                 if (viewholder is TextViewHolder) {
                     viewholder.binding.tvTitle.apply {
+                        tag = position
+                        println("ReaderPager------>bindViewHolder-->$position")
                         "当前是PAGE$position".also { text = it }
-                        setBackgroundColor(colors[Random.nextInt(4)])
+//                        setBackgroundColor(colors[Random.nextInt(4)])
+                        setBackgroundColor(Color.WHITE)
                     }
                 }else if (viewholder is ImageViewHolder) {
                     viewholder.binding.tvTitle.apply {
